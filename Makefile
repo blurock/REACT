@@ -20,7 +20,7 @@ createstructures: $(REACTLIBDIR)/libbasis.a
 
 ######################################################
 clean:
-	cd lib; rm -f lib*.a
+	rm -rf lib
 	rm -f ./*/*.o
 	cd chemdb; rm -f chemdb
 	cd $(BINDIR);rm -f createstructures
@@ -28,7 +28,7 @@ clean:
 	rm -f -r  genc
 	rm -f -r genh
 	rm -f -r tmp
-
+	mkdir lib
 runsetup:
 	chmod a+x bin/runsetup.sh
 	$(CCROOT)/bin/runsetup.sh
