@@ -5,7 +5,7 @@
 ######################################################
 # Directory Definitions                              #
 ######################################################
-SHELL:=/bin/bash
+SHELL         =/bin/bash
 BACKUPDIR     = backup
 REACTLIBDIR   = lib
 BINDIR        = bin
