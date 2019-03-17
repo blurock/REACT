@@ -29,7 +29,7 @@ clean:
 	rm -f -r genh
 	rm -f -r tmp
 	mkdir lib
-	mkdir lib/DB
+	rm data/DB/*.dbf
 runsetup:
 	chmod a+x bin/runsetup.sh
 	$(CCROOT)/bin/runsetup.sh
