@@ -5,7 +5,7 @@
 ######################################################
 # Directory Definitions                              #
 ######################################################
-
+SHELL:=/bin/bash
 BACKUPDIR     = backup
 REACTLIBDIR   = lib
 BINDIR        = bin
@@ -164,6 +164,7 @@ structs:
 genchdirs:
 	mkdir genc
 	mkdir genh
+	mkdir tmp
 	pushd $(REACTROOT)/genc;mkdir comlib;popd
 	pushd $(REACTROOT)/genh;mkdir comlib;popd
 	pushd $(REACTROOT)/genc;mkdir datmat;popd
