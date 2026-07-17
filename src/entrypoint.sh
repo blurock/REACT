@@ -1,37 +1,60 @@
 #!/bin/bash
-# REACTCloudRun Entrypoint Script
-# This script handles both CLI and HTTP modes
 
-set -e
+set -euo pipefail
 
-# Default mode
-MODE="${1:-cli}"
-PORT="${PORT:-8080}"
 REACTROOT="${REACTROOT:-/opt/react}"
 CCROOT="${CCROOT:-/opt/react}"
+PORT="${PORT:-}"
+REACT_MODE="${REACT_MODE:-}"
 
 export REACTROOT CCROOT
 
-echo "[entrypoint.sh] Starting REACT system..."
-echo "[entrypoint.sh] Mode: $MODE"
-echo "[entrypoint.sh] Port: $PORT"
-echo "[entrypoint.sh] REACTROOT: $REACTROOT"
+CHEMDB_BIN="$REACTROOT/bin/chemdb"
+HTTP_BIN="$REACTROOT/bin/http-server"
 
-case "$MODE" in
+start_http() {
+    if [[ -n "$PORT" ]]; then
+        exec "$HTTP_BIN" --port "$PORT" "$@"
+    fi
+    exec "$HTTP_BIN" "$@"
+}
+
+start_cli() {
+    exec "$CHEMDB_BIN" "$@"
+}
+
+if [[ ! -x "$CHEMDB_BIN" ]]; then
+    echo "chemdb binary not found at $CHEMDB_BIN" >&2
+    exit 1
+fi
+
+if [[ ! -x "$HTTP_BIN" ]]; then
+    echo "http-server binary not found at $HTTP_BIN" >&2
+    exit 1
+fi
+
+case "${1:-}" in
     http)
-        # Start HTTP server mode
-        echo "[entrypoint.sh] Starting HTTP server on port $PORT..."
-        exec "$REACTROOT/bin/http-server" --port "$PORT"
+        shift
+        start_http "$@"
         ;;
     cli)
-        # CLI mode - pass through all arguments to chemdb
-        echo "[entrypoint.sh] Starting CLI mode..."
-        shift  # Remove mode argument
-        exec "$REACTROOT/bin/chemdb" "$@"
-        ;;
-    *)
-        echo "[entrypoint.sh] Unknown mode: $MODE"
-        echo "Usage: $0 {cli|http} [args...]"
-        exit 1
+        shift
+        start_cli "$@"
         ;;
 esac
+
+case "$REACT_MODE" in
+    http)
+        start_http "$@"
+        ;;
+    cli)
+        start_cli "$@"
+        ;;
+esac
+
+if [[ $# -eq 0 && -n "$PORT" ]]; then
+    start_http
+fi
+
+start_cli "$@"

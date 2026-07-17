@@ -34,13 +34,16 @@ This directory contains test cases and test data for the CloudRun deployment.
 docker build -t react-test:latest .
 
 # Runtime test
-docker run react-test:latest cli --help
+docker run --rm react-test:latest --help
 
 # HTTP server test
-docker run -p 8080:8080 react-test:latest http
+docker run --rm -p 8080:8080 -e PORT=8080 react-test:latest
 
 # In another terminal:
 curl http://localhost:8080/health
+curl -X POST http://localhost:8080/api/run \
+  -H 'Content-Type: application/json' \
+  -d '{"args":["--help"]}'
 ```
 
 ## Test Data

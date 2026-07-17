@@ -16,7 +16,7 @@ REACTCloudRun packages the REACT system in a Docker container designed for:
 - **Cloud-Native Deployment**: Optimized for Google Cloud Run serverless platform
 - **Dual-Mode Operation**: CLI for batch processing or HTTP API for web requests
 - **Minimal Dependencies**: Only requires gdbm and standard C libraries
-- **Multi-Stage Build**: Optimized image size (~XXX MB - TBD after build)
+- **Multi-Stage Build**: Separate builder/runtime images for Cloud Run deployment
 
 ## Quick Links
 
@@ -51,8 +51,8 @@ REACTCloudRun packages the REACT system in a Docker container designed for:
 
 ```bash
 # Build and run with Docker Compose
-docker-compose build
-docker-compose up
+docker compose build
+docker compose up
 
 # The service will be available at http://localhost:8080
 ```
@@ -65,10 +65,10 @@ See [DEPLOY.md](docs/DEPLOY.md) for detailed Cloud Run deployment instructions.
 
 ```bash
 # Get help
-docker run reactcloudrun:latest cli --help
+docker run --rm reactcloudrun:latest --help
 
-# Run a calculation
-docker run reactcloudrun:latest cli [options] input.txt
+# Run the HTTP wrapper explicitly
+docker run --rm -p 8080:8080 -e PORT=8080 reactcloudrun:latest http
 ```
 
 ## Architecture Overview
@@ -77,7 +77,7 @@ docker run reactcloudrun:latest cli [options] input.txt
 
 The container can run in two modes:
 
-#### 1. CLI Mode (Default)
+#### 1. CLI Mode
 - Process batch jobs
 - Run from command line with arguments
 - Suitable for Cloud Tasks, Cloud Scheduler
@@ -85,7 +85,7 @@ The container can run in two modes:
 #### 2. HTTP Mode
 - Expose chemistry operations via REST API
 - Listen on port 8080
-- JSON request/response format
+- JSON request/response format with `POST /api/run`
 - Suitable for Cloud Run HTTP endpoints
 
 ### Container Layers (Multi-Stage Build)
@@ -122,11 +122,11 @@ The container can run in two modes:
 - Status: Requires modernization for current gcc
 
 ### REACTCloudRun Build Process
-- **Phase 2** (In Progress): Initial Dockerfile setup
-- **Phase 3** (TBD): Update C code for modern compiler
-- **Phase 4** (TBD): HTTP server implementation
-- **Phase 5** (TBD): Local testing
-- **Phase 6** (TBD): Production optimization
+- **Phase 2**: Multi-stage Dockerfile setup
+- **Phase 3**: C code updates for modern compiler compatibility
+- **Phase 4**: HTTP server and mode-switching entrypoint
+- **Phase 5**: Local testing
+- **Phase 6**: Production optimization
 
 ## Configuration
 
@@ -137,6 +137,7 @@ The container can run in two modes:
 | `PORT` | 8080 | HTTP server port |
 | `REACTROOT` | /opt/react | REACT installation directory |
 | `CCROOT` | /opt/react | REACT installation directory |
+| `REACT_MODE` | unset | Optional explicit mode override (`cli` or `http`) |
 
 ### Dockerfile Build Args
 
@@ -151,22 +152,22 @@ None currently, but can be added in Phase 6 for optimization.
 ## Troubleshooting
 
 ### Issue: Build fails with compiler errors
-**Solution**: Check Phase 3 documentation for C code updates needed
+**Solution**: Use the updated branch with the Phase 3 compiler fixes before building the image
 
 ### Issue: Container won't start
 **Solution**: Verify entrypoint.sh is executable and check logs
 
 ### Issue: HTTP port not responding
-**Solution**: Ensure PORT environment variable is set to 8080
+**Solution**: Ensure `PORT` is set and use `POST /api/run` with a JSON `args` array
 
 See [DEPLOY.md](docs/DEPLOY.md) for more troubleshooting.
 
 ## Development Phases
 
 ✅ **Phase 1**: Project Setup - Docker structure, .gitignore, initial files
-⏳ **Phase 2**: Dockerfile Creation - Multi-stage build
-⏳ **Phase 3**: C Code Updates - Fix compiler issues  
-⏳ **Phase 4**: Entry Point - HTTP server wrapper
+✅ **Phase 2**: Dockerfile Creation - Multi-stage build
+✅ **Phase 3**: C Code Updates - Fix compiler issues  
+✅ **Phase 4**: Entry Point - HTTP server wrapper
 ⏳ **Phase 5**: Local Testing - Docker Compose validation
 ⏳ **Phase 6**: Optimization - Image size, caching
 
@@ -191,10 +192,7 @@ Inherits from original REACT project. See LICENSE file.
 
 To continue development:
 
-1. **Phase 2**: Finalize Dockerfile and test build
-2. **Phase 3**: Run initial Docker build and capture compiler errors
-3. **Phase 4**: Implement HTTP server wrapper
-4. **Phase 5**: Test locally with docker-compose
-5. **Phase 6**: Optimize for production and Cloud Run
+1. **Phase 5**: Test locally with docker compose and the `/health` + `/api/run` endpoints
+2. **Phase 6**: Optimize image size and runtime footprint
 
 See [Implementation Plan](../../../session-state/96213969-ef5c-47f8-8b14-138695a0c189/files/implementation_plan.md) for details.

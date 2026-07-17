@@ -9,23 +9,26 @@ This is the CloudRun-ready containerized version of the REACT Chemistry System.
 
 ```bash
 # Build the Docker image
-docker-compose build
+docker compose build
 
 # Start in HTTP mode (port 8080)
-docker-compose up
+docker compose up
 
 # In another terminal, test the API
-curl -X GET http://localhost:8080/health
+curl http://localhost:8080/health
+curl -X POST http://localhost:8080/api/run \
+  -H 'Content-Type: application/json' \
+  -d '{"args":["--help"]}'
 ```
 
 ### Running in CLI Mode
 
 ```bash
 # Run chemdb with help
-docker run reactcloudrun:latest cli --help
+docker run --rm reactcloudrun:latest --help
 
 # Run a chemistry calculation (example)
-docker run reactcloudrun:latest cli --input file.txt --output result.txt
+docker run --rm -v "$PWD/data:/opt/react/data" reactcloudrun:latest [chemdb args...]
 ```
 
 ## Architecture
@@ -35,13 +38,41 @@ docker run reactcloudrun:latest cli --input file.txt --output result.txt
 - **Stage 2 (Runtime)**: Ubuntu 22.04-slim + runtime libraries only
 
 ### Dual-Mode Operation
-1. **CLI Mode** (default): Pass-through to chemdb binary
-2. **HTTP Mode**: Simple HTTP wrapper (Phase 4)
+1. **CLI Mode**: Pass-through to `chemdb` when you pass CLI args or explicitly use `cli`
+2. **HTTP Mode**: Starts automatically when the container has no args and `PORT` is set, or when you explicitly use `http`
 
 ### Environment Variables
 - `PORT` - HTTP server port (default: 8080)
 - `REACTROOT` - REACT installation directory (default: /opt/react)
 - `CCROOT` - REACT installation directory (default: /opt/react)
+- `REACT_MODE` - Optional explicit mode override (`cli` or `http`)
+
+### HTTP API
+
+#### `GET /health`
+Returns a simple health payload:
+
+```json
+{"status":"ok","service":"chemdb"}
+```
+
+#### `POST /api/run`
+Runs `chemdb` with a JSON array of CLI arguments:
+
+```bash
+curl -X POST http://localhost:8080/api/run \
+  -H 'Content-Type: application/json' \
+  -d '{"args":["--help"]}'
+```
+
+Example response:
+
+```json
+{
+  "exitCode": 0,
+  "output": "..."
+}
+```
 
 ## Deploying to Google Cloud Run
 
@@ -102,20 +133,22 @@ gcloud run logs read $IMAGE_NAME --region $REGION --follow
 
 ### Container Doesn't Start
 - Check entrypoint.sh permissions
-- Verify chemdb binary exists at /opt/react/bin/chemdb
+- Verify `chemdb` exists at `/opt/react/bin/chemdb`
+- Verify `http-server` exists at `/opt/react/bin/http-server`
 - Check environment variables are set correctly
 
 ### HTTP Server Issues
-- Ensure PORT is set correctly
+- Ensure `PORT` is set correctly
+- Confirm requests use JSON like `{"args":["--help"]}` for `/api/run`
 - Check firewall/routing rules on Cloud Run
 
 ## Development Notes
 
 ### Phase Status
 - ✅ Phase 1: Project Setup
-- ⏳ Phase 2: Dockerfile Creation
-- ⏳ Phase 3: C Code Updates
-- ⏳ Phase 4: Entry Point Wrapper
+- ✅ Phase 2: Dockerfile Creation
+- ✅ Phase 3: C Code Updates
+- ✅ Phase 4: Entry Point Wrapper
 - ⏳ Phase 5: Local Testing
 - ⏳ Phase 6: Production Optimization
 
