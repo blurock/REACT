@@ -25,3 +25,34 @@
 #other
 .cvsignore
 CVS
+
+# Docker build artifacts
+*.tar
+*.tar.gz
+docker-build/
+.docker/
+
+# Build temp dirs (Docker-related)
+genc/
+genh/
+tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-results/
+coverage/
