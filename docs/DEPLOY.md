@@ -101,30 +101,49 @@ curl -X POST http://localhost:8080/api/run-input \
 - `gcloud` CLI installed and authenticated
 - Docker installed locally
 
-### Build and Push to Cloud Registry
+### Build, Push, and Deploy (project `blurock-database`)
 
 ```bash
-# Set your GCP project ID
-export PROJECT_ID="your-project-id"
-export IMAGE_NAME="react-chemdb"
+# One-time project setup
+export PROJECT_ID="blurock-database"
 export REGION="us-central1"
+export SERVICE_NAME="react-chemdb"
+export REPO_NAME="react-images"
+export IMAGE_URI="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$SERVICE_NAME:latest"
+
+gcloud config set project "$PROJECT_ID"
+gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
+
+# One-time Artifact Registry repo setup
+gcloud artifacts repositories create "$REPO_NAME" \
+  --repository-format=docker \
+  --location="$REGION" \
+  --description="REACT Cloud Run images"
+
+# Allow Docker to push to Artifact Registry
+gcloud auth configure-docker "$REGION-docker.pkg.dev"
 
 # Build locally
-docker build -t gcr.io/$PROJECT_ID/$IMAGE_NAME:latest .
+docker build -t "$IMAGE_URI" .
 
-# Push to Google Container Registry
-docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
+# Push image
+docker push "$IMAGE_URI"
 
 # Deploy to Cloud Run
-gcloud run deploy $IMAGE_NAME \
-  --image gcr.io/$PROJECT_ID/$IMAGE_NAME:latest \
+gcloud run deploy "$SERVICE_NAME" \
+  --image "$IMAGE_URI" \
   --platform managed \
-  --region $REGION \
+  --region "$REGION" \
   --allow-unauthenticated \
   --set-env-vars PORT=8080 \
   --memory 2Gi \
   --timeout 3600 \
+  --cpu 2 \
+  --concurrency 1 \
   --max-instances 10
+
+# Show deployed URL
+gcloud run services describe "$SERVICE_NAME" --region "$REGION" --format='value(status.url)'
 ```
 
 ### Cloud Run Configuration
@@ -139,10 +158,10 @@ Recommended settings:
 
 ```bash
 # View logs from Cloud Run
-gcloud run logs read $IMAGE_NAME --region $REGION
+gcloud run logs read "$SERVICE_NAME" --region "$REGION"
 
 # Stream logs in real-time
-gcloud run logs read $IMAGE_NAME --region $REGION --follow
+gcloud run logs read "$SERVICE_NAME" --region "$REGION" --follow
 ```
 
 ## Troubleshooting
@@ -169,8 +188,8 @@ gcloud run logs read $IMAGE_NAME --region $REGION --follow
 - ✅ Phase 2: Dockerfile Creation
 - ✅ Phase 3: C Code Updates
 - ✅ Phase 4: Entry Point Wrapper
-- ⏳ Phase 5: Local Testing
-- ⏳ Phase 6: Production Optimization
+- ✅ Phase 5: Local Testing
+- ✅ Phase 6: Production Optimization
 
 See ../implementation_plan.md for detailed information.
 

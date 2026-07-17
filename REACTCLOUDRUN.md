@@ -94,13 +94,14 @@ The container can run in two modes:
 - Ubuntu 22.04 base
 - Build tools: gcc, make, build-essential
 - Development libraries: gdbm-dev, libc6-dev
-- Compiles entire REACT system
+- Runs `make all` to compile the REACT binaries
+- Runs `make install` to perform runtime setup and initialize the database files
 
 **Runtime Stage**
-- Ubuntu 22.04-slim base
-- Only runtime libraries: libc6, libgdbm6
+- Ubuntu 22.04 base
+- Runtime libraries: libc6, libgdbm6, libnsl2, libtirpc3, tcsh
 - Copies compiled binaries from build stage
-- Final size: ~XXX MB
+- Runs as a non-root `react` user
 
 ## External Dependencies
 
@@ -141,7 +142,7 @@ The container can run in two modes:
 
 ### Dockerfile Build Args
 
-None currently, but can be added in Phase 6 for optimization.
+None currently.
 
 ## Performance Considerations
 
@@ -157,6 +158,9 @@ None currently, but can be added in Phase 6 for optimization.
 ### Issue: Container won't start
 **Solution**: Verify entrypoint.sh is executable and check logs
 
+### Issue: Database files missing
+**Solution**: Rebuild the image from this branch; the Docker build explicitly runs `make all` followed by `make install`
+
 ### Issue: HTTP port not responding
 **Solution**: Ensure `PORT` is set and use `POST /api/run` with a JSON `args` array
 
@@ -168,8 +172,8 @@ See [DEPLOY.md](docs/DEPLOY.md) for more troubleshooting.
 ✅ **Phase 2**: Dockerfile Creation - Multi-stage build
 ✅ **Phase 3**: C Code Updates - Fix compiler issues  
 ✅ **Phase 4**: Entry Point - HTTP server wrapper
-⏳ **Phase 5**: Local Testing - Docker Compose validation
-⏳ **Phase 6**: Optimization - Image size, caching
+✅ **Phase 5**: Local Testing - Docker and endpoint validation
+✅ **Phase 6**: Optimization - Cloud Run runtime hardening and deploy flow
 
 ## Contributing
 
@@ -192,7 +196,7 @@ Inherits from original REACT project. See LICENSE file.
 
 To continue development:
 
-1. **Phase 5**: Test locally with docker compose and the `/health` + `/api/run` endpoints
-2. **Phase 6**: Optimize image size and runtime footprint
+1. Deploy to Cloud Run using `docs/DEPLOY.md` (Artifact Registry + `gcloud run deploy`)
+2. Tune memory, timeout, and max instances based on production usage
 
 See [Implementation Plan](../../../session-state/96213969-ef5c-47f8-8b14-138695a0c189/files/implementation_plan.md) for details.

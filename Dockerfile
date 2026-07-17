@@ -37,6 +37,11 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV REACTROOT=/opt/react
 ENV CCROOT=/opt/react
+ENV PORT=8080
+
+LABEL org.opencontainers.image.title="REACT Cloud Run"
+LABEL org.opencontainers.image.description="Containerized REACT chemistry system for Google Cloud Run"
+LABEL org.opencontainers.image.source="https://github.com/blurock/REACT"
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -48,20 +53,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tcsh \
     && rm -rf /var/lib/apt/lists/*
 
+# Use a non-root runtime user for Cloud Run.
+RUN groupadd --system --gid 10001 react \
+    && useradd --system --uid 10001 --gid react --home-dir /opt/react --shell /usr/sbin/nologin react
+
 # Create app directory
 WORKDIR /opt/react
 
 # Copy runtime binaries, libraries, and runtime assets from builder.
-COPY --from=builder /opt/react/bin /opt/react/bin
-COPY --from=builder /opt/react/lib /opt/react/lib
-COPY --from=builder /opt/react/data /opt/react/data
-COPY --from=builder /opt/react/programs /opt/react/programs
-COPY --from=builder /opt/react/command /opt/react/command
-COPY --from=builder /opt/react/tmp /opt/react/tmp
-COPY --from=builder /opt/react/elements.xml /opt/react/elements.xml
+COPY --from=builder --chown=react:react /opt/react/bin /opt/react/bin
+COPY --from=builder --chown=react:react /opt/react/lib /opt/react/lib
+COPY --from=builder --chown=react:react /opt/react/data /opt/react/data
+COPY --from=builder --chown=react:react /opt/react/programs /opt/react/programs
+COPY --from=builder --chown=react:react /opt/react/command /opt/react/command
+COPY --from=builder --chown=react:react /opt/react/tmp /opt/react/tmp
+COPY --from=builder --chown=react:react /opt/react/elements.xml /opt/react/elements.xml
 
 COPY src/entrypoint.sh /opt/react/entrypoint.sh
 RUN chmod +x /opt/react/entrypoint.sh
+
+USER react:react
 
 EXPOSE 8080
 
