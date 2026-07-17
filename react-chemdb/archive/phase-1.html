@@ -22,6 +22,11 @@
   </header>
   <main>
     <div class="context-note">
+      The project goal is to containerize the REACT chemistry system (a 12-year-old C codebase) for deployment on Google Cloud Run.
+      The overall strategy is a multi-stage Docker build producing a runtime image that can run <code>chemdb</code> either in CLI mode
+      or via an HTTP server wrapper on port 8080.
+    </div>
+    <div class="context-note">
       Thought process focus: establish project scope, baseline container strategy, and early task sequencing before major code changes.
     </div>
     <article class="md-content" data-markdown-src="/archive/raw/phase1-complete-962.md"></article>
