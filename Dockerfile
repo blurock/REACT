@@ -25,8 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /opt/react
 COPY . .
 
-# Build REACT and the Cloud Run HTTP wrapper.
-RUN REACTROOT=/opt/react CCROOT=/opt/react BINDIR=/opt/react/bin make install \
+# Build REACT binaries with `make all`, then run the installation step
+# that performs runtime setup and database initialization.
+RUN REACTROOT=/opt/react CCROOT=/opt/react BINDIR=/opt/react/bin make all \
+    && REACTROOT=/opt/react CCROOT=/opt/react BINDIR=/opt/react/bin make install \
     && gcc -O2 -Wall -Wextra -o /opt/react/bin/http-server /opt/react/src/http-server.c
 
 # Stage 2: Runtime
@@ -43,6 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdbm6 \
     libnsl2 \
     libtirpc3 \
+    tcsh \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
