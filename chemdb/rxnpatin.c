@@ -28,7 +28,7 @@
 */
 
 
-static ReactionMolfileUsingDB(int id,
+static void ReactionMolfileUsingDB(int id,
 			      char *line, 
 			      DataBaseInformation *dinfo,
 			      MolFileReaction *rxn);
@@ -299,7 +299,7 @@ static int ReadMolCorrespondences(FILE *file,
 **  REMARKS
 **
 */
-static ReactionMolfileUsingDB(int id,
+static void ReactionMolfileUsingDB(int id,
 			      char *line, 
 			      DataBaseInformation *dinfo,
 			      MolFileReaction *rxn)

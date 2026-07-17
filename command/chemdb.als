@@ -1,10 +1,10 @@
-ROOT                   /Users/edwardblurock/Reaction/REACT
-DATA                   /Users/edwardblurock/Reaction/REACT/data
-DBDIRECTORY            /Users/edwardblurock/Reaction/REACT/data/DB
-MOLDIR                 /Users/edwardblurock/Reaction/REACT/data/mol
-RXNDIR                 /Users/edwardblurock/Reaction/REACT/data/rxn
-PERFDIR                /Users/edwardblurock/Reaction/REACT/data/mech
-TABLEDIR               /Users/edwardblurock/Reaction/REACT/data/tables
+ROOT                   /Users/edwardblurock/git/react
+DATA                   /Users/edwardblurock/git/react/data
+DBDIRECTORY            /Users/edwardblurock/git/react/data/DB
+MOLDIR                 /Users/edwardblurock/git/react/data/mol
+RXNDIR                 /Users/edwardblurock/git/react/data/rxn
+PERFDIR                /Users/edwardblurock/git/react/data/mech
+TABLEDIR               /Users/edwardblurock/git/react/data/tables
 
 MOLECULEROOT           mol/molecule
 REACTIONROOT           rxn/reaction

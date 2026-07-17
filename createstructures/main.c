@@ -23,7 +23,7 @@ Line 2:  Structure Name, short structure name
 Line 3:  Symbol Definitions
 */
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
      {
      char filename[LINELENGTH];
      INT flag;

@@ -7,7 +7,7 @@ static void OutputSysLstStructure(StructureSet *set, FILE *file);
 static void OutputSysLstStructureExtern(StructureSet *set, FILE *file);
 static void OutputExternMaster(StructureSet *set, FILE *file);
 
-extern OutputSystemListFiles(StructureSet *set)
+extern void OutputSystemListFiles(StructureSet *set)
      {
      OutputExternMaster(set,set->SysFileH);
      OutputSysLstStructureExtern(set,set->SysFileH);

@@ -27,8 +27,8 @@ EXTRASYSTEMLIBS = -L/opt/local/lib
 CREATESTRUCT    = $(CCROOT)/bin/createstructures
 CC              = gcc
 #CCOPTIONS       = -g -DCOMDIR='"/home/blurock/react/command"'
-CCOPTIONS       = -g 
-#CCOPTIONS       = -O 
+CCOPTIONS       = -g -std=c89 -Wno-implicit-int -Wno-error=incompatible-function-pointer-types -Wno-error=implicit-function-declaration
+#CCOPTIONS       = -O
 RANLIB          = ranlib
 
 

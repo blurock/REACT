@@ -87,5 +87,5 @@ extern void OutputStructureSetdotH(StructureSet *set, FILE *file);
 extern void OutputStructureSetdotC(StructureSet *set, FILE *file);
 extern void PrintStructure(StructDefinition *structure);
 extern void PrintStructureSet(StructureSet *set);
-extern OutputSystemListFiles(StructureSet *set);
+extern void OutputSystemListFiles(StructureSet *set);
 
