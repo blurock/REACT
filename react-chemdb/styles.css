@@ -198,3 +198,106 @@ ol li {
   color: inherit;
   padding: 0;
 }
+
+.toc-hero {
+  border: 1px solid #bbdefb;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #e3f2fd 0%, #f8fbff 100%);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+.toc-hero h2 {
+  margin: 0 0 8px;
+}
+
+.toc-hero p {
+  margin: 0;
+  color: #334155;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 18px 0 10px;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0d47a1;
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 14px;
+}
+
+.phase-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(2, 22, 54, 0.06);
+}
+
+.phase-card:hover {
+  border-color: #90caf9;
+  box-shadow: 0 6px 18px rgba(21, 101, 192, 0.12);
+}
+
+.phase-card h3 {
+  margin: 0 0 6px;
+}
+
+.phase-card p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.phase-card .meta {
+  font-size: 0.8rem;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.source-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.source-item {
+  border: 1px dashed #bfccdc;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.source-item:hover {
+  border-color: #90caf9;
+  background: #f1f7ff;
+}
+
+.source-item h4 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.source-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
