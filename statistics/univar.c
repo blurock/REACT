@@ -266,13 +266,15 @@ static void ComputeUniVariate(UniVariateCluster *cluster,
      }
 
 	  
-static INT FloatComp(FLOAT *f1, FLOAT *f2)
+static INT FloatComp(const void *f1, const void *f2)
      {
      INT out;
+     const FLOAT *fp1 = (const FLOAT *)f1;
+     const FLOAT *fp2 = (const FLOAT *)f2;
      
-     if( (*f1) > (*f2) )
+     if( (*fp1) > (*fp2) )
 	  out = 1;
-     else if(*f1 < *f2)
+     else if(*fp1 < *fp2)
 	  out = -1;
      else
 	  out = 0;

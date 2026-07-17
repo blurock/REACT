@@ -18,7 +18,7 @@ MAINDIR    = ./$(PROGNAME)
 LIBNAME    = lib$(PROGNAME).a
 LIBFILE    = $(MYLIBDIR)/$(LIBNAME)
 
-EXTRASYSTEMLIBS = -L/opt/local/lib
+EXTRASYSTEMLIBS = -L/opt/homebrew/opt/gdbm/lib -L/opt/local/lib
 # for solaris
 #EXTRASYSTEMLIBS = -lnsl
 ######################################################

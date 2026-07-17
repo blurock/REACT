@@ -111,7 +111,7 @@ extern CHAR *AtomNameFromAtomicNumber(INT num)
 	  if(*(inf->Name) == ' ')
 	    {
 	      name = Malloc(4);
-	      *(name) = inf->Name+1;
+	      *(name) = *(inf->Name+1);
 	      *(name+1) = ' ';
 	      *(name+2) = '\0';
 	    }
