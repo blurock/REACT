@@ -19,6 +19,10 @@ curl http://localhost:8080/health
 curl -X POST http://localhost:8080/api/run \
   -H 'Content-Type: application/json' \
   -d '{"args":["--help"]}'
+
+curl -X POST http://localhost:8080/api/run-input \
+  -H 'Content-Type: application/json' \
+  -d '{"inputFile":"PrintRxnPatternsList.inp","root":"printpats"}'
 ```
 
 ### Running in CLI Mode
@@ -72,6 +76,22 @@ Example response:
   "exitCode": 0,
   "output": "..."
 }
+```
+
+#### `POST /api/run-input`
+Runs `runchem.sh` by piping a template file from `programs/inputs/*.inp`.
+
+Request body fields:
+- `inputFile` (required): safe `.inp` filename in `programs/inputs`
+- `root` (optional): run root name (default: `api`)
+- `replacements` (optional): key/value substitutions applied to template text before execution
+
+Example (`PrintRxnPatternsList.inp`):
+
+```bash
+curl -X POST http://localhost:8080/api/run-input \
+  -H 'Content-Type: application/json' \
+  -d '{"inputFile":"PrintRxnPatternsList.inp","root":"printpats"}'
 ```
 
 ## Deploying to Google Cloud Run

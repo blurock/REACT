@@ -2,14 +2,16 @@
  * Minimal HTTP wrapper for REACT/chemdb.
  *
  * Supported endpoints:
- *   GET  /           - API summary
- *   GET  /health     - Health check
- *   POST /api/run    - Execute chemdb with JSON body: {"args":["--help"]}
+ *   GET  /               - API summary
+ *   GET  /health         - Health check
+ *   POST /api/run        - Execute chemdb with JSON body: {"args":["--help"]}
+ *   POST /api/run-input  - Execute runchem.sh with an input template
  */
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -18,16 +20,30 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #define DEFAULT_PORT 8080
 #define MAX_ARGS 32
+#define MAX_REPLACEMENTS 64
 #define MAX_REQUEST_SIZE (1024 * 1024)
 #define READ_CHUNK 4096
+#define MAX_PATH_LENGTH 1024
+
+typedef struct Replacement {
+    char *key;
+    char *value;
+} Replacement;
 
 static volatile sig_atomic_t keep_running = 1;
+
+static const char *reactroot_env(void)
+{
+    const char *reactroot = getenv("REACTROOT");
+    return (reactroot == NULL || *reactroot == '\0') ? "/opt/react" : reactroot;
+}
 
 static void handle_signal(int signum)
 {
@@ -471,6 +487,117 @@ static int parse_args_array(const char *body, char **args, int *arg_count)
     return count > 0 ? 0 : -1;
 }
 
+static int parse_json_field_string(const char *body, const char *field_name, char **value)
+{
+    char pattern[128];
+    const char *field;
+    const char *cursor;
+
+    if (snprintf(pattern, sizeof(pattern), "\"%s\"", field_name) >= (int) sizeof(pattern)) {
+        return -1;
+    }
+
+    field = strstr(body, pattern);
+    if (field == NULL) {
+        return 1;
+    }
+
+    cursor = strchr(field, ':');
+    if (cursor == NULL) {
+        return -1;
+    }
+    ++cursor;
+    skip_whitespace(&cursor);
+
+    *value = parse_json_string(&cursor);
+    return (*value == NULL) ? -1 : 0;
+}
+
+static int parse_replacements_object(const char *body, Replacement *replacements, int *count)
+{
+    const char *field = strstr(body, "\"replacements\"");
+    const char *cursor;
+    int used = 0;
+
+    if (field == NULL) {
+        *count = 0;
+        return 0;
+    }
+
+    cursor = strchr(field, ':');
+    if (cursor == NULL) {
+        return -1;
+    }
+    ++cursor;
+    skip_whitespace(&cursor);
+
+    if (*cursor != '{') {
+        return -1;
+    }
+    ++cursor;
+
+    for (;;) {
+        char *key;
+        char *value;
+
+        skip_whitespace(&cursor);
+        if (*cursor == '}') {
+            ++cursor;
+            break;
+        }
+
+        if (used >= MAX_REPLACEMENTS) {
+            return -1;
+        }
+
+        key = parse_json_string(&cursor);
+        if (key == NULL) {
+            return -1;
+        }
+
+        skip_whitespace(&cursor);
+        if (*cursor != ':') {
+            free(key);
+            return -1;
+        }
+        ++cursor;
+        skip_whitespace(&cursor);
+
+        value = parse_json_string(&cursor);
+        if (value == NULL) {
+            free(key);
+            return -1;
+        }
+
+        replacements[used].key = key;
+        replacements[used].value = value;
+        ++used;
+
+        skip_whitespace(&cursor);
+        if (*cursor == ',') {
+            ++cursor;
+            continue;
+        }
+        if (*cursor == '}') {
+            ++cursor;
+            break;
+        }
+        return -1;
+    }
+
+    *count = used;
+    return 0;
+}
+
+static void free_replacements(Replacement *replacements, int count)
+{
+    int i;
+    for (i = 0; i < count; ++i) {
+        free(replacements[i].key);
+        free(replacements[i].value);
+    }
+}
+
 static void free_args(char **args, int arg_count)
 {
     int i;
@@ -479,22 +606,239 @@ static void free_args(char **args, int arg_count)
     }
 }
 
+static int read_text_file(const char *path, char **content)
+{
+    FILE *file = fopen(path, "rb");
+    long size;
+    char *buffer;
+
+    if (file == NULL) {
+        return -1;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return -1;
+    }
+    size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        return -1;
+    }
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return -1;
+    }
+
+    buffer = (char *) malloc((size_t) size + 1);
+    if (buffer == NULL) {
+        fclose(file);
+        return -1;
+    }
+
+    if (size > 0 && fread(buffer, 1, (size_t) size, file) != (size_t) size) {
+        free(buffer);
+        fclose(file);
+        return -1;
+    }
+
+    buffer[size] = '\0';
+    fclose(file);
+    *content = buffer;
+    return 0;
+}
+
+static int write_text_file(const char *path, const char *content)
+{
+    FILE *file = fopen(path, "wb");
+    size_t len = strlen(content);
+
+    if (file == NULL) {
+        return -1;
+    }
+
+    if (len > 0 && fwrite(content, 1, len, file) != len) {
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+    return 0;
+}
+
+static int ensure_directory_exists(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        return S_ISDIR(st.st_mode) ? 0 : -1;
+    }
+    if (mkdir(path, 0755) != 0 && errno != EEXIST) {
+        return -1;
+    }
+    return 0;
+}
+
+static int is_safe_input_filename(const char *name)
+{
+    size_t i;
+    size_t len = strlen(name);
+
+    if (len < 5 || len > 255) {
+        return 0;
+    }
+    if (strstr(name, "..") != NULL || strchr(name, '/') != NULL || strchr(name, '\\') != NULL) {
+        return 0;
+    }
+    if (strcmp(name + len - 4, ".inp") != 0) {
+        return 0;
+    }
+
+    for (i = 0; i < len; ++i) {
+        if (!(isalnum((unsigned char) name[i]) || name[i] == '_' || name[i] == '-' || name[i] == '.')) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static int is_safe_root(const char *root)
+{
+    size_t i;
+    size_t len = strlen(root);
+
+    if (len == 0 || len > 120) {
+        return 0;
+    }
+    for (i = 0; i < len; ++i) {
+        if (!(isalnum((unsigned char) root[i]) || root[i] == '_' || root[i] == '-')) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static char *replace_all_occurrences(const char *text, const char *needle, const char *replacement)
+{
+    const char *cursor = text;
+    const char *match;
+    size_t needle_len = strlen(needle);
+    size_t repl_len = strlen(replacement);
+    size_t count = 0;
+    size_t new_len;
+    char *result;
+    char *out;
+
+    if (needle_len == 0) {
+        return strdup(text);
+    }
+
+    while ((match = strstr(cursor, needle)) != NULL) {
+        ++count;
+        cursor = match + needle_len;
+    }
+
+    new_len = strlen(text) + count * (repl_len - needle_len);
+    result = (char *) malloc(new_len + 1);
+    if (result == NULL) {
+        return NULL;
+    }
+
+    cursor = text;
+    out = result;
+    while ((match = strstr(cursor, needle)) != NULL) {
+        size_t chunk = (size_t) (match - cursor);
+        memcpy(out, cursor, chunk);
+        out += chunk;
+        memcpy(out, replacement, repl_len);
+        out += repl_len;
+        cursor = match + needle_len;
+    }
+    strcpy(out, cursor);
+    return result;
+}
+
+static int apply_replacements(const char *template_content, Replacement *replacements, int count, char **output)
+{
+    char *current = strdup(template_content);
+    int i;
+
+    if (current == NULL) {
+        return -1;
+    }
+
+    for (i = 0; i < count; ++i) {
+        char *next = replace_all_occurrences(current, replacements[i].key, replacements[i].value);
+        free(current);
+        if (next == NULL) {
+            return -1;
+        }
+        current = next;
+    }
+
+    *output = current;
+    return 0;
+}
+
+static int capture_child_output(pid_t child, int read_fd, char **output, int *exit_code)
+{
+    size_t capacity = READ_CHUNK;
+    size_t used = 0;
+    char *buffer = (char *) malloc(capacity);
+    int status = 0;
+
+    if (buffer == NULL) {
+        close(read_fd);
+        waitpid(child, &status, 0);
+        return -1;
+    }
+
+    for (;;) {
+        ssize_t current;
+        if (used + READ_CHUNK + 1 > capacity) {
+            char *next = (char *) realloc(buffer, capacity * 2);
+            if (next == NULL) {
+                free(buffer);
+                close(read_fd);
+                waitpid(child, &status, 0);
+                return -1;
+            }
+            buffer = next;
+            capacity *= 2;
+        }
+
+        current = read(read_fd, buffer + used, capacity - used - 1);
+        if (current < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            free(buffer);
+            close(read_fd);
+            waitpid(child, &status, 0);
+            return -1;
+        }
+        if (current == 0) {
+            break;
+        }
+        used += (size_t) current;
+    }
+
+    close(read_fd);
+    waitpid(child, &status, 0);
+    buffer[used] = '\0';
+    *output = buffer;
+    *exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+    return 0;
+}
+
 static int run_chemdb(char **args, int arg_count, char **output, int *exit_code)
 {
-    const char *reactroot = getenv("REACTROOT");
-    char path_buffer[1024];
+    const char *reactroot = reactroot_env();
+    char path_buffer[MAX_PATH_LENGTH];
     char **argv;
     int pipefd[2];
     pid_t child;
-    size_t capacity = READ_CHUNK;
-    size_t used = 0;
-    char *buffer;
     int i;
-    int status = 0;
-
-    if (reactroot == NULL || *reactroot == '\0') {
-        reactroot = "/opt/react";
-    }
 
     if (snprintf(path_buffer, sizeof(path_buffer), "%s/bin/chemdb", reactroot) >= (int) sizeof(path_buffer)) {
         return -1;
@@ -536,58 +880,63 @@ static int run_chemdb(char **args, int arg_count, char **output, int *exit_code)
 
     close(pipefd[1]);
     free(argv);
+    return capture_child_output(child, pipefd[0], output, exit_code);
+}
 
-    buffer = (char *) malloc(capacity);
-    if (buffer == NULL) {
-        close(pipefd[0]);
-        waitpid(child, &status, 0);
+static int run_chem_template(const char *root, const char *input_file_path, char **output, int *exit_code)
+{
+    const char *reactroot = reactroot_env();
+    char runchem_path[MAX_PATH_LENGTH];
+    char tmp_dir[MAX_PATH_LENGTH];
+    int in_fd;
+    int pipefd[2];
+    pid_t child;
+    char *argv[3];
+
+    if (snprintf(runchem_path, sizeof(runchem_path), "%s/bin/runchem.sh", reactroot) >= (int) sizeof(runchem_path)) {
+        return -1;
+    }
+    if (snprintf(tmp_dir, sizeof(tmp_dir), "%s/tmp", reactroot) >= (int) sizeof(tmp_dir)) {
         return -1;
     }
 
-    for (;;) {
-        ssize_t current;
-
-        if (used + READ_CHUNK + 1 > capacity) {
-            char *next_buffer;
-            capacity *= 2;
-            next_buffer = (char *) realloc(buffer, capacity);
-            if (next_buffer == NULL) {
-                free(buffer);
-                close(pipefd[0]);
-                waitpid(child, &status, 0);
-                return -1;
-            }
-            buffer = next_buffer;
-        }
-
-        current = read(pipefd[0], buffer + used, capacity - used - 1);
-        if (current < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            free(buffer);
-            close(pipefd[0]);
-            waitpid(child, &status, 0);
-            return -1;
-        }
-        if (current == 0) {
-            break;
-        }
-        used += (size_t) current;
+    in_fd = open(input_file_path, O_RDONLY);
+    if (in_fd < 0) {
+        return -1;
+    }
+    if (pipe(pipefd) != 0) {
+        close(in_fd);
+        return -1;
     }
 
-    close(pipefd[0]);
-    waitpid(child, &status, 0);
+    argv[0] = runchem_path;
+    argv[1] = (char *) root;
+    argv[2] = NULL;
 
-    buffer[used] = '\0';
-    *output = buffer;
-    if (WIFEXITED(status)) {
-        *exit_code = WEXITSTATUS(status);
-    } else {
-        *exit_code = 1;
+    child = fork();
+    if (child < 0) {
+        close(in_fd);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return -1;
     }
 
-    return 0;
+    if (child == 0) {
+        dup2(in_fd, STDIN_FILENO);
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(in_fd);
+        close(pipefd[0]);
+        close(pipefd[1]);
+        chdir(tmp_dir);
+        execv(runchem_path, argv);
+        perror("execv");
+        _exit(127);
+    }
+
+    close(in_fd);
+    close(pipefd[1]);
+    return capture_child_output(child, pipefd[0], output, exit_code);
 }
 
 static int create_server_socket(int port)
@@ -645,44 +994,171 @@ static int handle_run_request(int client_fd, const char *body)
 
     if (run_chemdb(args, arg_count, &command_output, &exit_code) != 0) {
         free_args(args, arg_count);
-        return send_response(
-            client_fd,
-            500,
-            "application/json",
-            "{\"error\":\"Unable to execute chemdb.\"}");
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to execute chemdb.\"}");
     }
 
     escaped_output = json_escape(command_output);
-    if (escaped_output == NULL) {
-        free(command_output);
-        free_args(args, arg_count);
-        return send_response(
-            client_fd,
-            500,
-            "application/json",
-            "{\"error\":\"Unable to encode chemdb output.\"}");
-    }
-
-    response = build_json_message(
-        "{\"exitCode\":%d,\"output\":\"%s\"}",
-        exit_code,
-        escaped_output);
-
-    free(escaped_output);
     free(command_output);
     free_args(args, arg_count);
+    if (escaped_output == NULL) {
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to encode chemdb output.\"}");
+    }
 
+    response = build_json_message("{\"exitCode\":%d,\"output\":\"%s\"}", exit_code, escaped_output);
+    free(escaped_output);
     if (response == NULL) {
-        return send_response(
-            client_fd,
-            500,
-            "application/json",
-            "{\"error\":\"Unable to build response.\"}");
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to build response.\"}");
     }
 
     i = send_response(client_fd, 200, "application/json", response);
     free(response);
     return i;
+}
+
+static int handle_run_input_request(int client_fd, const char *body)
+{
+    const char *reactroot = reactroot_env();
+    Replacement replacements[MAX_REPLACEMENTS];
+    int replacement_count = 0;
+    char *input_file = NULL;
+    char *root = NULL;
+    char template_path[MAX_PATH_LENGTH];
+    char temp_input_path[MAX_PATH_LENGTH];
+    char tmp_dir[MAX_PATH_LENGTH];
+    char *template_content = NULL;
+    char *prepared_input = NULL;
+    char *command_output = NULL;
+    char *escaped_output = NULL;
+    char *response = NULL;
+    int exit_code = 1;
+    int status;
+
+    status = parse_json_field_string(body, "inputFile", &input_file);
+    if (status != 0 || input_file == NULL) {
+        return send_response(
+            client_fd,
+            400,
+            "application/json",
+            "{\"error\":\"Request must include inputFile, for example {\\\"inputFile\\\":\\\"PrintRxnPatternsList.inp\\\"}.\"}");
+    }
+
+    status = parse_json_field_string(body, "root", &root);
+    if (status < 0) {
+        free(input_file);
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"Invalid root value.\"}");
+    }
+    if (root == NULL) {
+        root = strdup("api");
+        if (root == NULL) {
+            free(input_file);
+            return send_response(client_fd, 500, "application/json", "{\"error\":\"Out of memory.\"}");
+        }
+    }
+
+    if (!is_safe_input_filename(input_file)) {
+        free(input_file);
+        free(root);
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"inputFile must be a safe .inp filename.\"}");
+    }
+    if (!is_safe_root(root)) {
+        free(input_file);
+        free(root);
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"root must use letters, numbers, underscore, or dash.\"}");
+    }
+
+    if (parse_replacements_object(body, replacements, &replacement_count) != 0) {
+        free(input_file);
+        free(root);
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"Invalid replacements object.\"}");
+    }
+
+    if (snprintf(template_path, sizeof(template_path), "%s/programs/inputs/%s", reactroot, input_file) >= (int) sizeof(template_path) ||
+        snprintf(tmp_dir, sizeof(tmp_dir), "%s/tmp", reactroot) >= (int) sizeof(tmp_dir) ||
+        snprintf(temp_input_path, sizeof(temp_input_path), "%s/tmp/%s.api.inp", reactroot, root) >= (int) sizeof(temp_input_path)) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Path too long.\"}");
+    }
+
+    if (read_text_file(template_path, &template_content) != 0) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        return send_response(client_fd, 404, "application/json", "{\"error\":\"Template input file not found.\"}");
+    }
+
+    if (apply_replacements(template_content, replacements, replacement_count, &prepared_input) != 0) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        free(template_content);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to prepare template input.\"}");
+    }
+
+    if (ensure_directory_exists(tmp_dir) != 0) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        free(template_content);
+        free(prepared_input);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to prepare temp directory.\"}");
+    }
+
+    if (write_text_file(temp_input_path, prepared_input) != 0) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        free(template_content);
+        free(prepared_input);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to write temp input file.\"}");
+    }
+
+    if (run_chem_template(root, temp_input_path, &command_output, &exit_code) != 0) {
+        unlink(temp_input_path);
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        free(template_content);
+        free(prepared_input);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to execute runchem template flow.\"}");
+    }
+
+    unlink(temp_input_path);
+
+    escaped_output = json_escape(command_output);
+    if (escaped_output == NULL) {
+        free(input_file);
+        free(root);
+        free_replacements(replacements, replacement_count);
+        free(template_content);
+        free(prepared_input);
+        free(command_output);
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to encode output.\"}");
+    }
+
+    response = build_json_message(
+        "{\"inputFile\":\"%s\",\"root\":\"%s\",\"exitCode\":%d,\"output\":\"%s\"}",
+        input_file,
+        root,
+        exit_code,
+        escaped_output);
+
+    free(input_file);
+    free(root);
+    free_replacements(replacements, replacement_count);
+    free(template_content);
+    free(prepared_input);
+    free(command_output);
+    free(escaped_output);
+
+    if (response == NULL) {
+        return send_response(client_fd, 500, "application/json", "{\"error\":\"Unable to build response.\"}");
+    }
+
+    status = send_response(client_fd, 200, "application/json", response);
+    free(response);
+    return status;
 }
 
 static int handle_request(int client_fd)
@@ -696,51 +1172,34 @@ static int handle_request(int client_fd)
     int result;
 
     if (read_request(client_fd, &request, &request_length, &header_end) != 0) {
-        return send_response(
-            client_fd,
-            400,
-            "application/json",
-            "{\"error\":\"Invalid HTTP request.\"}");
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"Invalid HTTP request.\"}");
     }
 
     if (sscanf(request, "%15s %255s", method, path) != 2) {
         free(request);
-        return send_response(
-            client_fd,
-            400,
-            "application/json",
-            "{\"error\":\"Unable to parse request line.\"}");
+        return send_response(client_fd, 400, "application/json", "{\"error\":\"Unable to parse request line.\"}");
     }
 
     body = request + header_end;
     (void) request_length;
 
     if (strcmp(method, "GET") == 0 && strcmp(path, "/health") == 0) {
-        result = send_response(
-            client_fd,
-            200,
-            "application/json",
-            "{\"status\":\"ok\",\"service\":\"chemdb\"}");
+        result = send_response(client_fd, 200, "application/json", "{\"status\":\"ok\",\"service\":\"chemdb\"}");
     } else if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
         result = send_response(
             client_fd,
             200,
             "application/json",
-            "{\"service\":\"chemdb\",\"endpoints\":[\"GET /health\",\"POST /api/run\"],\"example\":{\"args\":[\"--help\"]}}");
+            "{\"service\":\"chemdb\",\"endpoints\":[\"GET /health\",\"POST /api/run\",\"POST /api/run-input\"],"
+            "\"examples\":{\"run\":{\"args\":[\"--help\"]},\"runInput\":{\"inputFile\":\"PrintRxnPatternsList.inp\",\"root\":\"job1\"}}}");
     } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/run") == 0) {
         result = handle_run_request(client_fd, body);
+    } else if (strcmp(method, "POST") == 0 && strcmp(path, "/api/run-input") == 0) {
+        result = handle_run_input_request(client_fd, body);
     } else if (strcmp(method, "GET") != 0 && strcmp(method, "POST") != 0) {
-        result = send_response(
-            client_fd,
-            405,
-            "application/json",
-            "{\"error\":\"Only GET and POST are supported.\"}");
+        result = send_response(client_fd, 405, "application/json", "{\"error\":\"Only GET and POST are supported.\"}");
     } else {
-        result = send_response(
-            client_fd,
-            404,
-            "application/json",
-            "{\"error\":\"Endpoint not found.\"}");
+        result = send_response(client_fd, 404, "application/json", "{\"error\":\"Endpoint not found.\"}");
     }
 
     free(request);
