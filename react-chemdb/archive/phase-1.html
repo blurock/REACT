@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Phase 1 Completion | Archive</title>
   <link rel="stylesheet" href="/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="/archive/render-markdown.js"></script>
 </head>
 <body>
   <header>
@@ -15,8 +17,10 @@
     </nav>
   </header>
   <main>
-    <p>Thought process focus: establish project scope, baseline container strategy, and early task sequencing before major code changes.</p>
-    <iframe class="archive-frame" src="/archive/raw/phase1-complete-962.md" title="Phase 1 completion markdown"></iframe>
+    <div class="context-note">
+      Thought process focus: establish project scope, baseline container strategy, and early task sequencing before major code changes.
+    </div>
+    <article class="md-content" data-markdown-src="/archive/raw/phase1-complete-962.md"></article>
   </main>
 </body>
 </html>

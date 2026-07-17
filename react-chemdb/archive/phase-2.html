@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Phase 2 Completion | Archive</title>
   <link rel="stylesheet" href="/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="/archive/render-markdown.js"></script>
 </head>
 <body>
   <header>
@@ -15,8 +17,10 @@
     </nav>
   </header>
   <main>
-    <p>Thought process focus: compiler and header modernization, iterative build failure analysis, and stabilization of legacy C toolchain behavior.</p>
-    <iframe class="archive-frame" src="/archive/raw/phase2-complete-97.md" title="Phase 2 completion markdown"></iframe>
+    <div class="context-note">
+      Thought process focus: compiler and header modernization, iterative build failure analysis, and stabilization of legacy C toolchain behavior.
+    </div>
+    <article class="md-content" data-markdown-src="/archive/raw/phase2-complete-97.md"></article>
   </main>
 </body>
 </html>
