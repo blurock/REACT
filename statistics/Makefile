@@ -22,7 +22,7 @@ LIBFILE    = $(MYLIBDIR)/$(LIBNAME)
 ######################################################
 CREATESTRUCT    = $(CCROOT)/bin/createstructures
 CC              = gcc
-CCOPTIONS       = -g -DCOMDIR='"$(CCROOT)/command"'
+CCOPTIONS       = -g -std=gnu89 -fcommon -Wno-implicit-int -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -DCOMDIR='"$(CCROOT)/command"'
 RANLIB          = ranlib
 ###############################################################
 # Program specific definitions
@@ -51,7 +51,8 @@ COMMANDFILES = statistics.lst statistics.als\
 EXTRAS = main.c
 STD_INCLUDES = -I$(CCROOT)/genc\
                -I$(CCROOT)/genh\
-               -I$(CCROOT)/standard
+               -I$(CCROOT)/standard\
+               $(EXTRAINCLUDES)
 
 DEPLIBS = -L$(MYLIBDIR)\
            -lcluster\
@@ -107,4 +108,3 @@ depend:
 
 
 # DO NOT DELETE THIS LINE -- make depend depends on it.
-

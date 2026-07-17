@@ -27,7 +27,8 @@ EXTRAS =
 
 STD_INCLUDES = -I$(CCROOT)/genc\
                -I$(CCROOT)/genh\
-               -I$(CCROOT)/standard
+               -I$(CCROOT)/standard\
+               $(EXTRAINCLUDES)
 
 DEPLIBS = -L$(MYLIBDIR)\
            -lstructgen\

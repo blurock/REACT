@@ -10,6 +10,7 @@ BACKUPDIR  = $(CCROOT)/backup
 MYLIBDIR   = $(CCROOT)/lib
 BINDIR     = $(CCROOT)/bin
 MAINDIR    = ./$(PROGNAME)
+OSNAME     = $(shell uname -s)
 
 ######################################################
 # Library Definitions                                #
@@ -18,7 +19,13 @@ MAINDIR    = ./$(PROGNAME)
 LIBNAME    = lib$(PROGNAME).a
 LIBFILE    = $(MYLIBDIR)/$(LIBNAME)
 
+ifeq ($(OSNAME),Darwin)
+EXTRAINCLUDES  =
 EXTRASYSTEMLIBS = -L/opt/homebrew/opt/gdbm/lib -L/opt/local/lib
+else
+EXTRAINCLUDES  = -I/usr/include/tirpc
+EXTRASYSTEMLIBS = -ltirpc
+endif
 # for solaris
 #EXTRASYSTEMLIBS = -lnsl
 ######################################################
@@ -27,13 +34,9 @@ EXTRASYSTEMLIBS = -L/opt/homebrew/opt/gdbm/lib -L/opt/local/lib
 CREATESTRUCT    = $(CCROOT)/bin/createstructures
 CC              = gcc
 #CCOPTIONS       = -g -DCOMDIR='"/home/blurock/react/command"'
-CCOPTIONS       = -g -std=c89 -Wno-implicit-int -Wno-error=incompatible-function-pointer-types -Wno-error=implicit-function-declaration
+CCOPTIONS       = -g -std=gnu89 -fcommon -Wno-implicit-int -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration $(EXTRAINCLUDES)
 #CCOPTIONS       = -O
 RANLIB          = ranlib
-
-
-
-
 
 
 

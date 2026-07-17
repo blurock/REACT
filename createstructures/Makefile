@@ -24,7 +24,8 @@ ALL_OBJECTS = \
               strout.o strcon.o sysout.o
 STD_INCLUDES = -I$(CCROOT)/genc\
                -I$(CCROOT)/genh\
-               -I$(CCROOT)/standard
+               -I$(CCROOT)/standard\
+               $(EXTRAINCLUDES)
 CFLAGS = $(CCOPTIONS) $(STD_INCLUDES)
 DEPLIBS = -L$(MYLIBDIR)\
           -lbasis\

@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tcsh \
     libc6-dev \
     libgdbm-dev \
+    libnsl-dev \
+    libtirpc-dev \
     curl \
     git \
     && rm -rf /var/lib/apt/lists/*
@@ -28,7 +30,7 @@ RUN REACTROOT=/opt/react CCROOT=/opt/react BINDIR=/opt/react/bin make install \
     && gcc -O2 -Wall -Wextra -o /opt/react/bin/http-server /opt/react/src/http-server.c
 
 # Stage 2: Runtime
-FROM ubuntu:22.04-slim
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV REACTROOT=/opt/react
@@ -39,6 +41,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libc6 \
     libgdbm6 \
+    libnsl2 \
+    libtirpc3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory

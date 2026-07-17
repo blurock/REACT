@@ -22,7 +22,7 @@ LIBFILE    = $(MYLIBDIR)/$(LIBNAME)
 ######################################################
 CREATESTRUCT    = $(CCROOT)/bin/createstructures
 CC              = cc
-CCOPTIONS       = -g -DCOMDIR='"$(CCROOT)/command"'
+CCOPTIONS       = -g -std=gnu89 -fcommon -Wno-implicit-int -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -DCOMDIR='"$(CCROOT)/command"'
 RANLIB          = ranlib
 ###############################################################
 # Program specific definitions
@@ -49,7 +49,8 @@ EXTRAS =
 
 STD_INCLUDES = -I$(CCROOT)/genc\
                -I$(CCROOT)/genh\
-               -I$(CCROOT)/standard
+               -I$(CCROOT)/standard\
+               $(EXTRAINCLUDES)
 
 DEPLIBS = -L$(MYLIBDIR)\
            -lbasis\
